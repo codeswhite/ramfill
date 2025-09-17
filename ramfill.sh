@@ -1,12 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -eu
 
-CONFIG_FILE="$HOME/.config/ramfill.conf"
-MOUNT_POINT="/tmp/ramfill"
+# Ensure script runs as root
+if [[ "$EUID" -ne 0 ]]; then
+    echo "This script must be run as root." >&2
+    exit 1
+fi
+
+CONFIG_FILE="/etc/ramfill.conf"
+MOUNT_POINT="/mnt/ramfill"
 FILL_FILE="$MOUNT_POINT/fill"
 DEFAULT_SIZE="1G"
 DEFAULT_SOURCE="zero"  # allowed: zero, urandom
 
-# Load config value or fallback to defaults
+# Load config
 load_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         source "$CONFIG_FILE"
@@ -35,8 +42,8 @@ start_fill() {
         echo "tmpfs already mounted at $MOUNT_POINT"
     else
         echo "Mounting tmpfs at $MOUNT_POINT with size $RAM_FILL_SIZE..."
-        sudo mkdir -p "$MOUNT_POINT"
-        sudo mount -t tmpfs -o size="$RAM_FILL_SIZE" tmpfs "$MOUNT_POINT"
+        mkdir -p "$MOUNT_POINT"
+        mount -t tmpfs -o size="$RAM_FILL_SIZE" tmpfs "$MOUNT_POINT"
     fi
 
     if [[ ! -f "$FILL_FILE" ]]; then
@@ -50,13 +57,13 @@ start_fill() {
     df -h "$MOUNT_POINT"
 }
 
-# Unmount and clean up
+# Unmount and cleanup
 stop_fill() {
     if mountpoint -q "$MOUNT_POINT"; then
         USED=$(df -h --output=used "$MOUNT_POINT" | tail -1 | tr -d ' ')
         echo "Freeing ~$USED of RAM..."
-        sudo umount "$MOUNT_POINT"
-        sudo rmdir "$MOUNT_POINT"
+        umount "$MOUNT_POINT"
+        rmdir "$MOUNT_POINT"
     else
         echo "Nothing to stop. Mount point not active."
     fi
@@ -69,6 +76,14 @@ restart_fill() {
     start_fill
 }
 
+
+# Start in sync mode (sleep forever & stop on ^C)
+start_sync() {
+    start_fill
+    sleep infinity
+    stop_fill
+}
+
 # CLI handler
 main() {
     load_config
@@ -76,6 +91,7 @@ main() {
         start)   start_fill ;;
         stop)    stop_fill ;;
         restart) restart_fill ;;
+	start-sync) start_sync ;;
         *) echo "Usage: $0 {start|stop|restart}" && exit 1 ;;
     esac
 }
