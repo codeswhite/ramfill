@@ -1,0 +1,22 @@
+# /etc/systemd/system/ramfill.service
+[Unit]
+Description=RamFill
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ramfill.sh start-sync
+ExecStop=/usr/local/bin/ramfill.sh stop
+
+# Sandboxing allowed for root services
+PrivateTmp=yes
+#ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+NoNewPrivileges=yes
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target
